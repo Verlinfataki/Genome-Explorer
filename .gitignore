@@ -1,0 +1,19 @@
+# Environnement virtuel
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# Données temporaires
+data/processed/
+
+# Système
+.DS_Store
+Thumbs.db
