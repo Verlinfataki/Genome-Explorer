@@ -1,5 +1,9 @@
+from Bio.SeqUtils.ProtParam import ProteinAnalysis
 from genes import rechercher_gene
 from collections import Counter
+from Bio import Align
+from Bio.Blast import NCBIWWW
+from Bio.Blast import NCBIXML
 
 # ----------------------------------------------------------
 def traduire_gene(genome_record, nom_gene):
@@ -54,6 +58,12 @@ def traduire_gene(genome_record, nom_gene):
     # --------------------------------------------------
     sequence_adn = gene_feature.extract(genome_record.seq)
 
+
+    reste = len(sequence_adn) % 3
+
+    if reste != 0:
+        sequence_adn = sequence_adn[:-reste]
+
     # --------------------------------------------------
     # Traduction ADN → protéine.
     # to_stop=True signifie :
@@ -69,8 +79,6 @@ def traduire_gene(genome_record, nom_gene):
     # Retourner la protéine afin qu'elle puisse être
     # utilisée par d'autres fonctions du projet.
     return proteine
-
-   
 
 
 # ----------------------------------------------------------
@@ -112,5 +120,206 @@ def analyser_composition_proteine(proteine):
 
 
 
+def comparer_traductions(traduction_calculee, traduction_genbank):
+    """
+    Compare la traduction calculée avec celle fournie par GenBank.
+
+    Paramètres
+    ----------
+    traduction_calculee : str
+        Protéine obtenue avec notre algorithme.
+    traduction_genbank : str
+        Protéine officielle provenant de GenBank.
+
+    Retour
+    ------
+    bool
+        True si les deux séquences sont identiques,
+        False sinon.
+    """
+
+    return traduction_calculee == traduction_genbank
 
 
+def calculer_masse(proteine):
+    """
+    Calcule la masse moléculaire d'une protéine.
+
+    Paramètre
+    ---------
+    proteine : str
+        Séquence protéique.
+
+    Retour
+    ------
+    float
+        Masse moléculaire en Daltons (Da).
+    """
+
+    # Analyse de la protéine
+    analyse = ProteinAnalysis(proteine)
+
+    # Retourne la masse moléculaire
+    return analyse.molecular_weight()
+
+
+def calculer_pi(proteine):
+    """
+    Calcule le point isoélectrique d'une protéine.
+
+    Paramètre
+    ---------
+    proteine : str
+        Séquence protéique.
+
+    Retour
+    ------
+    float
+        Point isoélectrique.
+    """
+
+    # Analyse de la protéine
+    analyse = ProteinAnalysis(proteine)
+
+    # Retourne le point isoélectrique
+    return analyse.isoelectric_point()
+
+
+def calculer_hydrophobicite(proteine):
+    """
+    Calcule le pourcentage d'acides aminés hydrophobes.
+
+    Paramètre
+    ---------
+    proteine : str
+        Séquence protéique.
+
+    Retour
+    ------
+    float
+        Pourcentage d'acides aminés hydrophobes.
+    """
+
+    # Acides aminés hydrophobes
+    hydrophobes = {"A", "V", "I", "L", "M", "F", "W", "Y", "P"}
+
+    # Nombre d'acides aminés hydrophobes
+    nb = sum(1 for aa in proteine if aa in hydrophobes)
+
+    # Calcul du pourcentage
+    return (nb / len(proteine)) * 100
+
+
+
+def comparer_proteines(proteine1, proteine2):
+    """
+    Compare deux protéines position par position.
+
+    Paramètres
+    ----------
+    proteine1 : str
+        Première séquence protéique.
+    proteine2 : str
+        Deuxième séquence protéique.
+
+    Retour
+    ------
+    dict
+        Résultats de la comparaison.
+    """
+
+    # Longueur commune
+    longueur = min(len(proteine1), len(proteine2))
+
+    # Nombre d'acides aminés identiques
+    identiques = sum(
+        1
+        for aa1, aa2 in zip(proteine1[:longueur], proteine2[:longueur])
+        if aa1 == aa2
+    )
+
+    # Pourcentage d'identité
+    similarite = (identiques / longueur) * 100 if longueur > 0 else 0
+
+    return {
+        "longueur1": len(proteine1),
+        "longueur2": len(proteine2),
+        "identiques": identiques,
+        "longueur_comparee": longueur,
+        "similarite": similarite
+    }
+
+
+def aligner_proteines(proteine1, proteine2):
+    """
+    Réalise un alignement global de deux protéines.
+
+    Paramètres
+    ----------
+    proteine1 : str
+    proteine2 : str
+
+    Retour
+    ------
+    Alignment
+        Meilleur alignement trouvé.
+    """
+
+    aligner = Align.PairwiseAligner()
+    aligner.mode = "global"
+
+    alignements = aligner.align(proteine1, proteine2)
+
+    return alignements[0]
+
+
+def lancer_blast(proteine):
+    """
+    Lance une recherche BLASTP sur le serveur du NCBI.
+
+    Paramètre
+    ---------
+    proteine : str
+        Séquence protéique.
+
+    Retour
+    ------
+    Blast
+        Résultat BLAST.
+    """
+
+    # Envoi de la séquence au NCBI
+    resultat = NCBIWWW.qblast(
+        "blastp",
+        "nr",
+        proteine
+    )
+
+    # Lecture du résultat XML
+    blast = NCBIXML.read(resultat)
+
+    return blast
+
+
+def meilleurs_hits(blast, limite=5):
+    """
+    Extrait les meilleurs résultats BLAST.
+    """
+
+    hits = []
+
+    for alignement in blast.alignments[:limite]:
+
+        hsp = alignement.hsps[0]
+
+        hits.append({
+            "accession": alignement.accession,
+            "description": alignement.hit_def.split(">")[0][:120],
+            "score": hsp.score,
+            "identite": (
+                hsp.identities / hsp.align_length
+            ) * 100,
+            "longueur": hsp.align_length
+        })
+
+    return hits

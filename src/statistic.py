@@ -43,13 +43,13 @@ def calculer_statistiques_genes(genome_record):
             genes_moins += 1
 
     statistiques = {
-        "nombre_genes": len(longueurs),
-        "longueur_min": min(longueurs),
-        "longueur_max": max(longueurs),
-        "longueur_moyenne": mean(longueurs),
-        "longueur_mediane": median(longueurs),
-        "genes_plus": genes_plus,
-        "genes_moins": genes_moins,
+        "gene_count": len(longueurs),
+        "min_length": min(longueurs),
+        "max_length": max(longueurs),
+        "mean_length": mean(longueurs),
+        "median_length": median(longueurs),
+        "plus_strand": genes_plus,
+        "minus_strand": genes_moins,
     }
 
     return statistiques
